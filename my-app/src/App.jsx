@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseclient";
 import "./App.css";
 
+const ADMIN_EMAIL = "admin@gmail.com";
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +89,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, email, role")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -97,11 +99,13 @@ export default function App() {
       }
 
       if (!data) {
+        const roleToInsert = user.email === ADMIN_EMAIL ? "admin" : "user";
+
         const { error: insertError } = await supabase.from("profiles").insert([
           {
             id: user.id,
             email: user.email,
-            role: "user",
+            role: roleToInsert,
           },
         ]);
 
@@ -118,7 +122,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, email, role, created_at")
         .eq("id", userId)
         .maybeSingle();
 
@@ -127,6 +131,7 @@ export default function App() {
         return;
       }
 
+      console.log("PROFILE DATA:", data);
       setProfile(data);
     } catch (err) {
       console.error("loadProfile unexpected error:", err);
@@ -572,6 +577,7 @@ export default function App() {
                         <td>
                           {user.id !== session.user.id && (
                             <button
+                              type="button"
                               className="delete-btn"
                               onClick={() => deleteUserByAdmin(user.id)}
                             >
@@ -607,6 +613,7 @@ export default function App() {
                 onChange={(e) => setUserFilter(e.target.value)}
               />
               <button
+                type="button"
                 className="secondary-btn"
                 onClick={() => {
                   setDateFilter("");
