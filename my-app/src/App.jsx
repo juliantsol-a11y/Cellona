@@ -28,34 +28,28 @@ export default function App() {
 
   useEffect(() => {
     const init = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      setSession(session);
-
-      if (session?.user) {
-        await ensureProfile(session.user);
-        await loadProfile(session.user.id);
-        await loadMyAttendance(session.user.id);
+        setSession(session);
+      } catch (error) {
+        console.error("Init error:", error);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     init();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setMessage("");
 
-      if (session?.user) {
-        await ensureProfile(session.user);
-        await loadProfile(session.user.id);
-        await loadMyAttendance(session.user.id);
-      } else {
+      if (!session) {
         setProfile(null);
         setHistory([]);
         setAdminRecords([]);
@@ -67,104 +61,77 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-  const init = async () => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    const loadUserData = async () => {
+      if (!session?.user) return;
 
-      setSession(session);
-
-      if (session?.user) {
+      try {
         await ensureProfile(session.user);
         await loadProfile(session.user.id);
         await loadMyAttendance(session.user.id);
+      } catch (error) {
+        console.error("loadUserData error:", error);
       }
-    } catch (error) {
-      console.error("Init error:", error);
-    } finally {
-      setLoading(false);
+    };
+
+    loadUserData();
+  }, [session]);
+
+  useEffect(() => {
+    if (session?.user && isAdmin) {
+      loadAllAttendance();
+      loadUsers();
+    }
+  }, [session, isAdmin]);
+
+  const ensureProfile = async (user) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("ensureProfile select error:", error);
+        return;
+      }
+
+      if (!data) {
+        const { error: insertError } = await supabase.from("profiles").insert([
+          {
+            id: user.id,
+            email: user.email,
+            role: "user",
+          },
+        ]);
+
+        if (insertError) {
+          console.error("ensureProfile insert error:", insertError);
+        }
+      }
+    } catch (err) {
+      console.error("ensureProfile unexpected error:", err);
     }
   };
 
-  init();
-
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    try {
-      setSession(session);
-      setMessage("");
-
-      if (session?.user) {
-        await ensureProfile(session.user);
-        await loadProfile(session.user.id);
-        await loadMyAttendance(session.user.id);
-      } else {
-        setProfile(null);
-        setHistory([]);
-        setAdminRecords([]);
-        setUsers([]);
-      }
-    } catch (error) {
-      console.error("Auth state error:", error);
-    } finally {
-      setLoading(false);
-    }
-  });
-
-  return () => subscription.unsubscribe();
-}, []);
-
-  const ensureProfile = async (user) => {
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("ensureProfile select error:", error);
-      return;
-    }
-
-    if (!data) {
-      const { error: insertError } = await supabase.from("profiles").insert([
-        {
-          id: user.id,
-          email: user.email,
-          role: "user",
-        },
-      ]);
-
-      if (insertError) {
-        console.error("ensureProfile insert error:", insertError);
-      }
-    }
-  } catch (err) {
-    console.error("ensureProfile unexpected error:", err);
-  }
-};
-
   const loadProfile = async (userId) => {
-  try {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
 
-    if (error) {
-      console.error("loadProfile error:", error);
-      return;
+      if (error) {
+        console.error("loadProfile error:", error);
+        return;
+      }
+
+      setProfile(data);
+    } catch (err) {
+      console.error("loadProfile unexpected error:", err);
     }
-
-    setProfile(data);
-  } catch (err) {
-    console.error("loadProfile unexpected error:", err);
-  }
-};
+  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -214,46 +181,61 @@ export default function App() {
   };
 
   const loadMyAttendance = async (userId) => {
-    const { data, error } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("user_id", userId)
-      .order("date", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false });
 
-    if (error) {
-      setMessage(error.message);
-      return;
+      if (error) {
+        console.error("loadMyAttendance error:", error);
+        setMessage(error.message);
+        return;
+      }
+
+      setHistory(data || []);
+    } catch (err) {
+      console.error("loadMyAttendance unexpected error:", err);
     }
-
-    setHistory(data || []);
   };
 
   const loadAllAttendance = async () => {
-    const { data, error } = await supabase
-      .from("attendance")
-      .select("*")
-      .order("date", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("*")
+        .order("date", { ascending: false });
 
-    if (error) {
-      setMessage(error.message);
-      return;
+      if (error) {
+        console.error("loadAllAttendance error:", error);
+        setMessage(error.message);
+        return;
+      }
+
+      setAdminRecords(data || []);
+    } catch (err) {
+      console.error("loadAllAttendance unexpected error:", err);
     }
-
-    setAdminRecords(data || []);
   };
 
   const loadUsers = async () => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      setMessage(error.message);
-      return;
+      if (error) {
+        console.error("loadUsers error:", error);
+        setMessage(error.message);
+        return;
+      }
+
+      setUsers(data || []);
+    } catch (err) {
+      console.error("loadUsers unexpected error:", err);
     }
-
-    setUsers(data || []);
   };
 
   const getTodayDate = () => {
