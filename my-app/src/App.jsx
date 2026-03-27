@@ -204,16 +204,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from("attendance")
-        .select(`
-          id,
-          user_id,
-          date,
-          time_in,
-          time_out,
-          profiles:user_id (
-            email
-          )
-        `)
+        .select("*")
         .order("date", { ascending: false })
         .order("time_in", { ascending: false });
 
@@ -395,13 +386,18 @@ export default function App() {
     return new Date(value).toLocaleString();
   };
 
+  const getEmailByUserId = (userId) => {
+    const matchedUser = users.find((u) => u.id === userId);
+    return matchedUser?.email || "Unknown";
+  };
+
   const getEmailName = (email) => {
     if (!email) return "";
     return email.split("@")[0];
   };
 
   const filteredAdminRecords = adminRecords.filter((record) => {
-    const recordEmail = record.profiles?.email || "";
+    const recordEmail = getEmailByUserId(record.user_id);
     const recordName = getEmailName(recordEmail);
 
     const matchDate = dateFilter ? record.date === dateFilter : true;
@@ -640,7 +636,7 @@ export default function App() {
               <table>
                 <thead>
                   <tr>
-                    <th>Name</th>
+                    <th>User ID</th>
                     <th>Email</th>
                     <th>Date</th>
                     <th>Time In</th>
@@ -651,8 +647,8 @@ export default function App() {
                   {filteredAdminRecords.length > 0 ? (
                     filteredAdminRecords.map((item) => (
                       <tr key={item.id}>
-                        <td>{getEmailName(item.profiles?.email || "")}</td>
-                        <td>{item.profiles?.email || "Unknown"}</td>
+                        <td>{item.user_id}</td>
+                        <td>{getEmailByUserId(item.user_id)}</td>
                         <td>{item.date}</td>
                         <td>{formatDateTime(item.time_in)}</td>
                         <td>{formatDateTime(item.time_out)}</td>
