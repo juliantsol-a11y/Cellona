@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react"
-import { supabase } from "./supabaseclient"
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "./supabaseclient";
+import "./App.css";
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
 
