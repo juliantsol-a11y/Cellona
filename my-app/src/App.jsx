@@ -74,34 +74,54 @@ export default function App() {
   }, [session, isAdmin]);
 
   const ensureProfile = async (user) => {
-    const { data } = await supabase
+  try {
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .maybeSingle();
 
+    if (error) {
+      console.error("ensureProfile select error:", error);
+      return;
+    }
+
     if (!data) {
-      await supabase.from("profiles").insert([
+      const { error: insertError } = await supabase.from("profiles").insert([
         {
           id: user.id,
           email: user.email,
           role: "user",
         },
       ]);
+
+      if (insertError) {
+        console.error("ensureProfile insert error:", insertError);
+      }
     }
-  };
+  } catch (err) {
+    console.error("ensureProfile unexpected error:", err);
+  }
+};
 
   const loadProfile = async (userId) => {
+  try {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
 
-    if (!error) {
-      setProfile(data);
+    if (error) {
+      console.error("loadProfile error:", error);
+      return;
     }
-  };
+
+    setProfile(data);
+  } catch (err) {
+    console.error("loadProfile unexpected error:", err);
+  }
+};
 
   const handleRegister = async (e) => {
     e.preventDefault();
