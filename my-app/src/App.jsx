@@ -20,10 +20,6 @@ export default function App() {
 
   const [dateFilter, setDateFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
-
-  const [newUserEmail, setNewUserEmail] = useState("");
-  const [newUserPassword, setNewUserPassword] = useState("");
-  const [newUserRole, setNewUserRole] = useState("user");
   const [userSearch, setUserSearch] = useState("");
 
   const isAdmin = useMemo(() => {
@@ -326,61 +322,6 @@ export default function App() {
     if (isAdmin) loadAllAttendance();
   };
 
-  const createUserByAdmin = async (e) => {
-    e.preventDefault();
-    setMessage("");
-
-    const response = await fetch("/api/create-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        adminEmail: session.user.email,
-        email: newUserEmail,
-        password: newUserPassword,
-        role: newUserRole,
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      setMessage(result.error || "Failed to create user.");
-      return;
-    }
-
-    setMessage("User account created successfully.");
-    setNewUserEmail("");
-    setNewUserPassword("");
-    setNewUserRole("user");
-    loadUsers();
-  };
-
-  const deleteUserByAdmin = async (userId) => {
-    const response = await fetch("/api/delete-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        adminEmail: session.user.email,
-        userId,
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      setMessage(result.error || "Failed to delete user.");
-      return;
-    }
-
-    setMessage("User deleted successfully.");
-    loadUsers();
-    loadAllAttendance();
-  };
-
   const formatDateTime = (value) => {
     if (!value) return "-";
     return new Date(value).toLocaleString();
@@ -529,33 +470,6 @@ export default function App() {
           <section className="card admin-card">
             <h2>Admin Account Panel</h2>
 
-            <form onSubmit={createUserByAdmin} className="admin-form">
-              <input
-                type="email"
-                placeholder="New user email"
-                value={newUserEmail}
-                onChange={(e) => setNewUserEmail(e.target.value)}
-                required
-              />
-              <input
-                type="password"
-                placeholder="New user password"
-                value={newUserPassword}
-                onChange={(e) => setNewUserPassword(e.target.value)}
-                required
-              />
-              <select
-                value={newUserRole}
-                onChange={(e) => setNewUserRole(e.target.value)}
-              >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-              <button type="submit" className="primary-btn">
-                Create Account
-              </button>
-            </form>
-
             <div className="filters">
               <input
                 type="text"
@@ -572,7 +486,6 @@ export default function App() {
                     <th>Email</th>
                     <th>Role</th>
                     <th>Created At</th>
-                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -582,22 +495,11 @@ export default function App() {
                         <td>{user.email}</td>
                         <td>{user.role}</td>
                         <td>{formatDateTime(user.created_at)}</td>
-                        <td>
-                          {user.id !== session.user.id && (
-                            <button
-                              type="button"
-                              className="delete-btn"
-                              onClick={() => deleteUserByAdmin(user.id)}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4">No users found.</td>
+                      <td colSpan="3">No users found.</td>
                     </tr>
                   )}
                 </tbody>
