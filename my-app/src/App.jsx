@@ -410,14 +410,14 @@ export default function App() {
       <header className="topbar">
         <div>
           <h1>Attendance Tracking System</h1>
-            <p className="subtitle">
-          Logged in as: {session.user.email} ({isAdmin ? "admin" : profile?.role || "user"})
-        </p>
-      </div>
+          <p className="subtitle">
+            Logged in as: {session.user.email} ({isAdmin ? "admin" : profile?.role || "user"})
+          </p>
+        </div>
         <button className="logout-btn" onClick={handleLogout}>
-        Logout
+          Logout
         </button>
-    </header>
+      </header>
 
       {message && <div className="notice">{message}</div>}
 
