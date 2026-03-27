@@ -408,16 +408,16 @@ export default function App() {
   return (
     <div className="page">
       <header className="topbar">
-        <div>
-          <h1>Attendance Tracking System</h1>
-          <p className="subtitle">
-            Logged in as: {session.user.email} ({isAdmin ? "admin" : profile?.role || "user"})
-          </p>
-        </div>
-        <button className="logout-btn" onClick={handleLogout}>
-          Logout
-        </button>
-      </header>
+  <div>
+    <h1>Attendance Tracking System</h1>
+    <p className="subtitle">
+      Logged in as: {session.user.email} ({isAdmin ? "admin" : profile?.role || "user"})
+    </p>
+  </div>
+  <button className="logout-btn" onClick={handleLogout}>
+    Logout
+  </button>
+</header>
 
       {message && <div className="notice">{message}</div>}
 
