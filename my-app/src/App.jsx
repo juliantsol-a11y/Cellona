@@ -67,11 +67,54 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (session?.user && isAdmin) {
-      loadAllAttendance();
-      loadUsers();
+  const init = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      setSession(session);
+
+      if (session?.user) {
+        await ensureProfile(session.user);
+        await loadProfile(session.user.id);
+        await loadMyAttendance(session.user.id);
+      }
+    } catch (error) {
+      console.error("Init error:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [session, isAdmin]);
+  };
+
+  init();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    try {
+      setSession(session);
+      setMessage("");
+
+      if (session?.user) {
+        await ensureProfile(session.user);
+        await loadProfile(session.user.id);
+        await loadMyAttendance(session.user.id);
+      } else {
+        setProfile(null);
+        setHistory([]);
+        setAdminRecords([]);
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error("Auth state error:", error);
+    } finally {
+      setLoading(false);
+    }
+  });
+
+  return () => subscription.unsubscribe();
+}, []);
 
   const ensureProfile = async (user) => {
   try {
