@@ -339,6 +339,33 @@ export default function App() {
     if (isAdmin) loadAllAttendance();
   };
 
+  const deleteUserByAdmin = async (userId) => {
+  const confirmed = window.confirm("Delete this user account?");
+  if (!confirmed) return;
+
+  const response = await fetch("/api/delete-user", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      adminEmail: session.user.email,
+      userId,
+    }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    setMessage(result.error || "Failed to delete user.");
+    return;
+  }
+
+  setMessage("User account deleted successfully.");
+  loadUsers();
+  loadAllAttendance();
+};
+
   const formatDateTime = (value) => {
     if (!value) return "-";
     return new Date(value).toLocaleString();
@@ -495,44 +522,56 @@ export default function App() {
       {isAdmin && (
         <>
           <section className="card admin-card">
-            <h2>Admin Account Panel</h2>
+  <h2>Admin Account Panel</h2>
 
-            <div className="filters">
-              <input
-                type="text"
-                placeholder="Search user by email"
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-              />
-            </div>
+  <div className="filters">
+    <input
+      type="text"
+      placeholder="Search user by email"
+      value={userSearch}
+      onChange={(e) => setUserSearch(e.target.value)}
+    />
+  </div>
 
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Created At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((user) => (
-                      <tr key={user.id}>
-                        <td>{user.email}</td>
-                        <td>{user.role}</td>
-                        <td>{formatDateTime(user.created_at)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="3">No users found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+  <div className="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Created At</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {filteredUsers.length > 0 ? (
+          filteredUsers.map((user) => (
+            <tr key={user.id}>
+              <td>{user.email}</td>
+              <td>{user.role}</td>
+              <td>{formatDateTime(user.created_at)}</td>
+              <td>
+                {user.email !== ADMIN_EMAIL && (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => deleteUserByAdmin(user.id)}
+                  >
+                    Remove Account
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan="4">No users found.</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</section>
 
           <section className="card admin-card">
             <h2>Administrator Monitoring Interface</h2>
