@@ -243,84 +243,67 @@ export default function App() {
   };
 
   const handleTimeIn = async () => {
-    setMessage("");
-    const today = getTodayDate();
+  setMessage("");
 
-    const { data: existing, error: checkError } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .eq("date", today)
-      .maybeSingle();
+  const { error } = await supabase.from("attendance").insert([
+    {
+      user_id: session.user.id,
+      date: new Date().toISOString().split("T")[0],
+      time_in: new Date().toISOString(),
+      time_out: null,
+      status: "open",
+    },
+  ]);
 
-    if (checkError) {
-      setMessage(checkError.message);
-      return;
-    }
+  if (error) {
+    setMessage(error.message);
+    return;
+  }
 
-    if (existing?.time_in) {
-      setMessage("Already timed in.");
-      return;
-    }
-
-    const { error } = await supabase.from("attendance").insert([
-      {
-        user_id: session.user.id,
-        date: today,
-        time_in: new Date().toISOString(),
-      },
-    ]);
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setMessage("Time-in recorded successfully.");
-    loadMyAttendance(session.user.id);
-    if (isAdmin) loadAllAttendance();
-  };
+  setMessage("Time-in recorded successfully.");
+  loadMyAttendance(session.user.id);
+  if (isAdmin) loadAllAttendance();
+};
 
   const handleTimeOut = async () => {
-    setMessage("");
-    const today = getTodayDate();
+  setMessage("");
 
-    const { data: existing, error: checkError } = await supabase
-      .from("attendance")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .eq("date", today)
-      .maybeSingle();
+  const { data: existing, error: checkError } = await supabase
+    .from("attendance")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .is("time_out", null)
+    .order("time_in", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-    if (checkError) {
-      setMessage(checkError.message);
-      return;
-    }
+  if (checkError) {
+    setMessage(checkError.message);
+    return;
+  }
 
-    if (!existing) {
-      setMessage("No time-in record found for today.");
-      return;
-    }
+  if (!existing) {
+    setMessage("No open time-in record found.");
+    return;
+  }
 
-    if (existing?.time_out) {
-      setMessage("Already timed out.");
-      return;
-    }
+  const { error } = await supabase
+    .from("attendance")
+    .update({
+      time_out: new Date().toISOString(),
+      status: "completed",
+    })
+    .eq("id", existing.id);
 
-    const { error } = await supabase
-      .from("attendance")
-      .update({ time_out: new Date().toISOString() })
-      .eq("id", existing.id);
+  if (error) {
+    setMessage(error.message);
+    return;
+  }
 
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    setMessage("Time-out recorded successfully.");
-    loadMyAttendance(session.user.id);
-    if (isAdmin) loadAllAttendance();
-  };
+  setMessage("Time-out recorded successfully.");
+  loadMyAttendance(session.user.id);
+  if (isAdmin) loadAllAttendance();
+};
 
   const formatDateTime = (value) => {
     if (!value) return "-";
@@ -443,6 +426,7 @@ export default function App() {
                   <th>Date</th>
                   <th>Time In</th>
                   <th>Time Out</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -452,11 +436,20 @@ export default function App() {
                       <td>{item.date}</td>
                       <td>{formatDateTime(item.time_in)}</td>
                       <td>{formatDateTime(item.time_out)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => deleteMyAttendance(item.id)}
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="3">No attendance records yet.</td>
+                    <td colSpan="4">No attendance records yet.</td>
                   </tr>
                 )}
               </tbody>
