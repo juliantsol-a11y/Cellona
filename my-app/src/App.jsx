@@ -245,6 +245,25 @@ export default function App() {
   const handleTimeIn = async () => {
   setMessage("");
 
+  const { data: openRecord, error: openError } = await supabase
+    .from("attendance")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .is("time_out", null)
+    .order("time_in", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (openError) {
+    setMessage(openError.message);
+    return;
+  }
+
+  if (openRecord) {
+    setMessage("You already have an open time-in record. Please time out first.");
+    return;
+  }
+
   const { error } = await supabase.from("attendance").insert([
     {
       user_id: session.user.id,
