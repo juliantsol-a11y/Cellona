@@ -13,10 +13,6 @@ export default async function handler(req, res) {
 
     const { adminEmail, userId } = req.body;
 
-    if (adminEmail !== "admin@gmail.com") {
-      return res.status(403).json({ error: "Unauthorized" });
-    }
-
     const { error } = await supabase.auth.admin.deleteUser(userId);
 
     if (error) {
