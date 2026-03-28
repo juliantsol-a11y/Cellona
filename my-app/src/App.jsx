@@ -357,9 +357,8 @@ export default function App() {
 
     const result = await response.json();
 
-    console.log("Delete API response:", result);
-
     if (!response.ok) {
+      console.error("Delete user API error:", result);
       setMessage(result.error || "Failed to delete user.");
       return;
     }
