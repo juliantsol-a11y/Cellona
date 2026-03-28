@@ -8,13 +8,16 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
+
   const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState([]);
   const [adminRecords, setAdminRecords] = useState([]);
   const [users, setUsers] = useState([]);
+
   const [dateFilter, setDateFilter] = useState("");
   const [userFilter, setUserFilter] = useState("");
   const [userSearch, setUserSearch] = useState("");
@@ -23,29 +26,54 @@ export default function App() {
     return profile?.role === "admin" || session?.user?.email === ADMIN_EMAIL;
   }, [profile, session]);
 
-  // --- LOGIC FUNCTIONS (Unchanged from your original code) ---
   useEffect(() => {
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         setSession(session);
-      } catch (error) { console.error(error); } finally { setLoading(false); }
+      } catch (error) {
+        console.error("Init error:", error);
+      } finally {
+        setLoading(false);
+      }
     };
+
     init();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (!session) { setProfile(null); setHistory([]); setAdminRecords([]); setUsers([]); }
+      setMessage("");
+
+      if (!session) {
+        setProfile(null);
+        setHistory([]);
+        setAdminRecords([]);
+        setUsers([]);
+      }
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (session?.user) {
-      ensureProfile(session.user).then(() => {
-        loadProfile(session.user.id);
-        loadMyAttendance(session.user.id);
-      });
-    }
+    const loadUserData = async () => {
+      if (!session?.user) return;
+
+      try {
+        await ensureProfile(session.user);
+        await loadProfile(session.user.id);
+        await loadMyAttendance(session.user.id);
+      } catch (error) {
+        console.error("loadUserData error:", error);
+      }
+    };
+
+    loadUserData();
   }, [session]);
 
   useEffect(() => {
@@ -56,191 +84,561 @@ export default function App() {
   }, [session, isAdmin]);
 
   const ensureProfile = async (user) => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-    if (!data) {
-      const roleToInsert = user.email === ADMIN_EMAIL ? "admin" : "user";
-      await supabase.from("profiles").insert([{ id: user.id, email: user.email, role: roleToInsert }]);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("ensureProfile select error:", error);
+        return;
+      }
+
+      if (!data) {
+        const roleToInsert = user.email === ADMIN_EMAIL ? "admin" : "user";
+
+        const { error: insertError } = await supabase.from("profiles").insert([
+          {
+            id: user.id,
+            email: user.email,
+            role: roleToInsert,
+          },
+        ]);
+
+        if (insertError) {
+          console.error("ensureProfile insert error:", insertError);
+        }
+      }
+    } catch (err) {
+      console.error("ensureProfile unexpected error:", err);
     }
   };
 
-  const loadProfile = async (id) => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", id).maybeSingle();
-    setProfile(data);
+  const loadProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, email, role, created_at")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("loadProfile error:", error);
+        return;
+      }
+
+      setProfile(data);
+    } catch (err) {
+      console.error("loadProfile unexpected error:", err);
+    }
   };
 
-  const loadMyAttendance = async (uid) => {
-    const { data } = await supabase.from("attendance").select("*").eq("user_id", uid).order("time_in", { ascending: false });
-    setHistory(data || []);
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("Registered successfully!");
+    setEmail("");
+    setPassword("");
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setEmail("");
+    setPassword("");
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const loadMyAttendance = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("*")
+        .eq("user_id", userId)
+        .order("date", { ascending: false })
+        .order("time_in", { ascending: false });
+
+      if (error) {
+        console.error("loadMyAttendance error:", error);
+        setMessage(error.message);
+        return;
+      }
+
+      setHistory(data || []);
+    } catch (err) {
+      console.error("loadMyAttendance unexpected error:", err);
+    }
   };
 
   const loadAllAttendance = async () => {
-    const { data } = await supabase.from("attendance").select("*").order("time_in", { ascending: false });
-    setAdminRecords(data || []);
+    try {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("*")
+        .order("date", { ascending: false })
+        .order("time_in", { ascending: false });
+
+      if (error) {
+        console.error("loadAllAttendance error:", error);
+        setMessage(error.message);
+        return;
+      }
+
+      setAdminRecords(data || []);
+    } catch (err) {
+      console.error("loadAllAttendance unexpected error:", err);
+    }
   };
 
   const loadUsers = async () => {
-    const { data } = await supabase.from("profiles").select("*");
-    setUsers(data || []);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("loadUsers error:", error);
+        setMessage(error.message);
+        return;
+      }
+
+      setUsers(data || []);
+    } catch (err) {
+      console.error("loadUsers unexpected error:", err);
+    }
   };
 
   const handleTimeIn = async () => {
-    const open = history.find(r => r.time_out === null);
-    if (open) return setMessage("Already clocked in.");
-    const { error } = await supabase.from("attendance").insert([{
-      user_id: session.user.id,
-      date: new Date().toISOString().split("T")[0],
-      time_in: new Date().toISOString(),
-      status: "open"
-    }]);
-    if (!error) { setMessage("Clocked In!"); loadMyAttendance(session.user.id); }
+    setMessage("");
+
+    const { data: openRecord, error: openError } = await supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .is("time_out", null)
+      .order("time_in", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (openError) {
+      setMessage(openError.message);
+      return;
+    }
+
+    if (openRecord) {
+      setMessage("You already have an open time-in record. Please time out first.");
+      return;
+    }
+
+    const { error } = await supabase.from("attendance").insert([
+      {
+        user_id: session.user.id,
+        date: new Date().toISOString().split("T")[0],
+        time_in: new Date().toISOString(),
+        time_out: null,
+        status: "open",
+      },
+    ]);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("Time-in recorded successfully.");
+    loadMyAttendance(session.user.id);
+    if (isAdmin) loadAllAttendance();
   };
 
   const handleTimeOut = async () => {
-    const open = history.find(r => r.time_out === null);
-    if (!open) return setMessage("Not clocked in.");
-    await supabase.from("attendance").update({ time_out: new Date().toISOString(), status: "completed" }).eq("id", open.id);
-    setMessage("Clocked Out!");
+    setMessage("");
+
+    const { data: existing, error: checkError } = await supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .is("time_out", null)
+      .order("time_in", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (checkError) {
+      setMessage(checkError.message);
+      return;
+    }
+
+    if (!existing) {
+      setMessage("No open time-in record found.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("attendance")
+      .update({
+        time_out: new Date().toISOString(),
+        status: "completed",
+      })
+      .eq("id", existing.id);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("Time-out recorded successfully.");
     loadMyAttendance(session.user.id);
+    if (isAdmin) loadAllAttendance();
   };
 
-  const handleLogout = () => supabase.auth.signOut();
-  
-  const formatTime = (val) => val ? new Date(val).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--";
-  const getEmailName = (email) => email?.split("@")[0] || "User";
+  const deleteMyAttendance = async (attendanceId) => {
+    const confirmed = window.confirm("Delete this attendance record?");
+    if (!confirmed) return;
 
-  // --- UI RENDERING ---
+    const { error } = await supabase
+      .from("attendance")
+      .delete()
+      .eq("id", attendanceId)
+      .eq("user_id", session.user.id);
 
-  if (loading) return <div className="loader">Initializing...</div>;
+    if (error) {
+      console.error("Delete error:", error);
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("Attendance record deleted successfully.");
+    loadMyAttendance(session.user.id);
+    if (isAdmin) loadAllAttendance();
+  };
+
+  const deleteUserByAdmin = async (userId) => {
+  const confirmed = window.confirm("Delete this user account?");
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch("/api/delete-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        adminEmail: session.user.email,
+        userId,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("Delete user API error:", result);
+      setMessage(result.error || "Failed to delete user.");
+      return;
+    }
+
+    setMessage("User account deleted successfully.");
+    loadUsers();
+    loadAllAttendance();
+  } catch (error) {
+    console.error("Delete fetch error:", error);
+    setMessage("Server error while deleting account.");
+  }
+};
+
+  const formatDateTime = (value) => {
+    if (!value) return "-";
+    return new Date(value).toLocaleString();
+  };
+
+  const getEmailByUserId = (userId) => {
+    const matchedUser = users.find((u) => u.id === userId);
+    return matchedUser?.email || "Unknown";
+  };
+
+  const getEmailName = (email) => {
+    if (!email) return "";
+    return email.split("@")[0];
+  };
+
+  const filteredAdminRecords = adminRecords.filter((record) => {
+    const recordEmail = getEmailByUserId(record.user_id);
+    const recordName = getEmailName(recordEmail);
+
+    const matchDate = dateFilter ? record.date === dateFilter : true;
+    const matchUser = userFilter
+      ? recordName.toLowerCase().includes(userFilter.toLowerCase())
+      : true;
+
+    return matchDate && matchUser;
+  });
+
+  const filteredUsers = users.filter((user) =>
+    user.email.toLowerCase().includes(userSearch.toLowerCase())
+  );
+
+  if (loading) {
+    return <div className="center-box">Loading...</div>;
+  }
 
   if (!session) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0f172a' }}>
-        <div className="card" style={{ width: '350px', textAlign: 'center' }}>
-          <h1 style={{ color: '#6366f1' }}>CorpTrack</h1>
-          <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>Attendance Management System</p>
-          <form onSubmit={(e) => { e.preventDefault(); authMode === 'login' ? /* handleLogin */ null : /* handleRegister */ null }}>
-            <input type="email" placeholder="Email" className="modern-input" onChange={(e) => setEmail(e.target.value)} required style={{ width: '90%', marginBottom: '10px', padding: '10px' }} />
-            <input type="password" placeholder="Password" className="modern-input" onChange={(e) => setPassword(e.target.value)} required style={{ width: '90%', marginBottom: '20px', padding: '10px' }} />
-            <button className="btn-primary" style={{ width: '100%' }}>{authMode === "login" ? "Sign In" : "Register"}</button>
+      <div className="auth-page">
+        <div className="card auth-card">
+          <h1>Attendance Tracking System</h1>
+          <p className="subtitle">Register or log in</p>
+
+          <div className="auth-switch">
+            <button
+              className={authMode === "login" ? "active" : ""}
+              onClick={() => setAuthMode("login")}
+            >
+              Login
+            </button>
+            <button
+              className={authMode === "register" ? "active" : ""}
+              onClick={() => setAuthMode("register")}
+            >
+              Register
+            </button>
+          </div>
+
+          <form onSubmit={authMode === "login" ? handleLogin : handleRegister}>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button type="submit" className="primary-btn">
+              {authMode === "login" ? "Login" : "Register"}
+            </button>
           </form>
-          <button onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} style={{ background: 'none', border: 'none', marginTop: '15px', color: '#6366f1', cursor: 'pointer' }}>
-            {authMode === 'login' ? "Need an account? Register" : "Have an account? Login"}
-          </button>
+
+          {message && <p className="message">{message}</p>}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="dashboard-layout">
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-        <h2><span style={{ color: '#6366f1' }}>●</span> CorpTrack</h2>
-        <div className="nav-item active">Dashboard</div>
-        <div className="nav-item">My Schedule</div>
-        {isAdmin && <div className="nav-item">Admin Console</div>}
-        <div className="nav-item" style={{ marginTop: 'auto', color: '#f87171' }} onClick={handleLogout}>Logout</div>
-      </aside>
+    <div className="page">
+      <header className="topbar">
+        <div>
+          <h1>Attendance Tracking System</h1>
+          <p className="subtitle">
+            Logged in as: {session.user.email} ({isAdmin ? "admin" : profile?.role || "user"})
+          </p>
+        </div>
+        <button className="logout-btn" onClick={handleLogout}>
+          Logout
+        </button>
+      </header>
 
-      {/* MAIN CONTENT */}
-      <main className="main-content">
-        <header className="header-flex">
-          <div>
-            <h1 style={{ margin: 0 }}>Hello, {getEmailName(session.user.email)}</h1>
-            <span style={{ color: '#64748b' }}>{new Date().toDateString()}</span>
-          </div>
-          <span className={`badge ${isAdmin ? 'badge-admin' : 'badge-user'}`}>
-            {isAdmin ? 'System Admin' : 'Employee'}
-          </span>
-        </header>
+      {message && <div className="notice">{message}</div>}
 
-        {/* STATS SECTION - Professors love visualized data */}
-        <section className="stats-grid">
-          <div className="stat-card">
-            <h3>Current Status</h3>
-            <p style={{ color: history[0]?.time_out === null ? '#10b981' : '#64748b' }}>
-              {history[0]?.time_out === null ? "Clocked In" : "Clocked Out"}
-            </p>
+      <section className="grid">
+        <div className="card">
+          <h2>User Panel</h2>
+          <div className="button-row">
+            <button className="primary-btn" onClick={handleTimeIn}>
+              Time In
+            </button>
+            <button className="secondary-btn" onClick={handleTimeOut}>
+              Time Out
+            </button>
           </div>
-          <div className="stat-card">
-            <h3>Total Work Days</h3>
-            <p>{history.length}</p>
-          </div>
-          <div className="stat-card">
-            <h3>Account Email</h3>
-            <p style={{ fontSize: '1rem' }}>{session.user.email}</p>
-          </div>
-        </section>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-          {/* ACTION PANEL */}
-          <section className="card">
-            <h2>Time Clock</h2>
-            <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Record your attendance for today.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '1.5rem' }}>
-              <button className="btn-success" onClick={handleTimeIn}>Punch In</button>
-              <button className="btn-danger" onClick={handleTimeOut}>Punch Out</button>
-            </div>
-            {message && <p style={{ color: '#6366f1', fontSize: '0.9rem', textAlign: 'center' }}>{message}</p>}
-          </section>
-
-          {/* RECENT HISTORY */}
-          <section className="card">
-            <h2>Recent Activity</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>In</th>
-                  <th>Out</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.slice(0, 5).map(row => (
-                  <tr key={row.id}>
-                    <td>{row.date}</td>
-                    <td>{formatTime(row.time_in)}</td>
-                    <td>{formatTime(row.time_out)}</td>
-                    <td><span style={{ color: row.status === 'open' ? '#10b981' : '#64748b' }}>{row.status}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
         </div>
 
-        {/* ADMIN MONITORING */}
-        {isAdmin && (
-          <section className="card" style={{ marginTop: '2rem', borderTop: '4px solid #6366f1' }}>
-            <h2>Enterprise Attendance Monitor</h2>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
-                <input type="text" placeholder="Search staff..." className="modern-input" style={{ flex: 1, padding: '8px' }} onChange={(e) => setUserFilter(e.target.value)} />
-                <input type="date" className="modern-input" onChange={(e) => setDateFilter(e.target.value)} />
-            </div>
+        <div className="card">
+          <h2>My Attendance History</h2>
+          <div className="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Employee</th>
                   <th>Date</th>
-                  <th>Punch In</th>
-                  <th>Punch Out</th>
+                  <th>Time In</th>
+                  <th>Time Out</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {adminRecords.slice(0, 10).map(rec => (
-                  <tr key={rec.id}>
-                    <td style={{ fontWeight: '600' }}>{getEmailName(users.find(u => u.id === rec.user_id)?.email)}</td>
-                    <td>{rec.date}</td>
-                    <td>{formatTime(rec.time_in)}</td>
-                    <td>{formatTime(rec.time_out)}</td>
+                {history.length > 0 ? (
+                  history.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.date}</td>
+                      <td>{formatDateTime(item.time_in)}</td>
+                      <td>{formatDateTime(item.time_out)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => deleteMyAttendance(item.id)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4">No attendance records yet.</td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
-          </section>
+          </div>
+        </div>
+      </section>
+
+      {isAdmin && (
+        <>
+          <section className="card admin-card">
+  <h2>Admin Account Panel</h2>
+
+  <div className="filters">
+    <input
+      type="text"
+      placeholder="Search user by email"
+      value={userSearch}
+      onChange={(e) => setUserSearch(e.target.value)}
+    />
+  </div>
+
+  <div className="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Created At</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {filteredUsers.length > 0 ? (
+          filteredUsers.map((user) => (
+            <tr key={user.id}>
+              <td>{user.email}</td>
+              <td>{user.role}</td>
+              <td>{formatDateTime(user.created_at)}</td>
+              <td>
+                {user.email !== ADMIN_EMAIL && (
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => deleteUserByAdmin(user.id)}
+                  >
+                    Remove Account
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan="4">No users found.</td>
+          </tr>
         )}
-      </main>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+          <section className="card admin-card">
+            <h2>Administrator Monitoring Interface</h2>
+
+            <div className="filters">
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Filter by name (before @)"
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+              />
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => {
+                  setDateFilter("");
+                  setUserFilter("");
+                }}
+              >
+                Clear Filters
+              </button>
+            </div>
+
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>User ID</th>
+                    <th>Email</th>
+                    <th>Date</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAdminRecords.length > 0 ? (
+                    filteredAdminRecords.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.user_id}</td>
+                        <td>{getEmailByUserId(item.user_id)}</td>
+                        <td>{item.date}</td>
+                        <td>{formatDateTime(item.time_in)}</td>
+                        <td>{formatDateTime(item.time_out)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5">No matching records found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }
