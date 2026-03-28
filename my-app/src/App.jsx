@@ -343,27 +343,34 @@ export default function App() {
   const confirmed = window.confirm("Delete this user account?");
   if (!confirmed) return;
 
-  const response = await fetch("/api/delete-user", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      adminEmail: session.user.email,
-      userId,
-    }),
-  });
+  try {
+    const response = await fetch("/api/delete-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        adminEmail: session.user.email,
+        userId,
+      }),
+    });
 
-  const result = await response.json();
+    const result = await response.json();
 
-  if (!response.ok) {
-    setMessage(result.error || "Failed to delete user.");
-    return;
+    console.log("Delete API response:", result);
+
+    if (!response.ok) {
+      setMessage(result.error || "Failed to delete user.");
+      return;
+    }
+
+    setMessage("User account deleted successfully.");
+    loadUsers();
+    loadAllAttendance();
+  } catch (error) {
+    console.error("Delete fetch error:", error);
+    setMessage("Server error while deleting account.");
   }
-
-  setMessage("User account deleted successfully.");
-  loadUsers();
-  loadAllAttendance();
 };
 
   const formatDateTime = (value) => {
