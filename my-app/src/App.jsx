@@ -409,7 +409,6 @@ export default function App() {
 
   if (!session) {
     return (
-      <div className="overall">
       <div className="auth-page">
         <div className="card auth-card">
           <h1>Attendance Tracking System</h1>
@@ -454,7 +453,6 @@ export default function App() {
 
           {message && <p className="message">{message}</p>}
         </div>
-      </div>
       </div>
     );
   }

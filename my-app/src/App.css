@@ -2,9 +2,6 @@
   box-sizing: border-box;
 }
 
-.overall{
-  align-items: center;
-}
 
 :root {
   --bg: #f2f7f3;
