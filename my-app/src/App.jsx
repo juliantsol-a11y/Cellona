@@ -340,37 +340,37 @@ export default function App() {
   };
 
   const deleteUserByAdmin = async (userId) => {
-  const confirmed = window.confirm("Delete this user account?");
-  if (!confirmed) return;
+    const confirmed = window.confirm("Delete this user account?");
+    if (!confirmed) return;
 
-  try {
-    const response = await fetch("/api/delete-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        adminEmail: session.user.email,
-        userId,
-      }),
-    });
+    try {
+      const response = await fetch("/api/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          adminEmail: session.user.email,
+          userId,
+        }),
+      });
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (!response.ok) {
-      console.error("Delete user API error:", result);
-      setMessage(result.error || "Failed to delete user.");
-      return;
+      if (!response.ok) {
+        console.error("Delete user API error:", result);
+        setMessage(result.error || "Failed to delete user.");
+        return;
+      }
+
+      setMessage("User account deleted successfully.");
+      loadUsers();
+      loadAllAttendance();
+    } catch (error) {
+      console.error("Delete fetch error:", error);
+      setMessage("Server error while deleting account.");
     }
-
-    setMessage("User account deleted successfully.");
-    loadUsers();
-    loadAllAttendance();
-  } catch (error) {
-    console.error("Delete fetch error:", error);
-    setMessage("Server error while deleting account.");
-  }
-};
+  };
 
   const formatDateTime = (value) => {
     if (!value) return "-";
@@ -412,18 +412,20 @@ export default function App() {
       <div className="auth-page">
         <div className="card auth-card">
           <h1>Attendance Tracking System</h1>
-          <p className="subtitle">Register or log in</p>
+          <p className="auth-subtitle">Register or log in</p>
 
           <div className="auth-switch">
             <button
               className={authMode === "login" ? "active" : ""}
               onClick={() => setAuthMode("login")}
+              type="button"
             >
               Login
             </button>
             <button
               className={authMode === "register" ? "active" : ""}
               onClick={() => setAuthMode("register")}
+              type="button"
             >
               Register
             </button>
@@ -456,189 +458,191 @@ export default function App() {
   }
 
   return (
-    <div className="page">
-      <header className="topbar">
-        <div>
-          <h1>Attendance Tracking System</h1>
-          <p className="subtitle">
-            Logged in as: {session.user.email} ({isAdmin ? "admin" : profile?.role || "user"})
-          </p>
-        </div>
-        <button className="logout-btn" onClick={handleLogout}>
-          Logout
-        </button>
-      </header>
-
-      {message && <div className="notice">{message}</div>}
-
-      <section className="grid">
-        <div className="card">
-          <h2>User Panel</h2>
-          <div className="button-row">
-            <button className="primary-btn" onClick={handleTimeIn}>
-              Time In
-            </button>
-            <button className="secondary-btn" onClick={handleTimeOut}>
-              Time Out
-            </button>
+    <div className="app-shell">
+      <div className="page">
+        <header className="topbar">
+          <div>
+            <h1>Attendance Tracking System</h1>
+            <p className="subtitle">
+              Logged in as: {session.user.email} ({isAdmin ? "admin" : profile?.role || "user"})
+            </p>
           </div>
-        </div>
+          <button className="logout-btn" onClick={handleLogout}>
+            Logout
+          </button>
+        </header>
 
-        <div className="card">
-          <h2>My Attendance History</h2>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Time In</th>
-                  <th>Time Out</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.length > 0 ? (
-                  history.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.date}</td>
-                      <td>{formatDateTime(item.time_in)}</td>
-                      <td>{formatDateTime(item.time_out)}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="secondary-btn"
-                          onClick={() => deleteMyAttendance(item.id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4">No attendance records yet.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+        {message && <div className="notice">{message}</div>}
 
-      {isAdmin && (
-        <>
-          <section className="card admin-card">
-  <h2>Admin Account Panel</h2>
-
-  <div className="filters">
-    <input
-      type="text"
-      placeholder="Search user by email"
-      value={userSearch}
-      onChange={(e) => setUserSearch(e.target.value)}
-    />
-  </div>
-
-  <div className="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Email</th>
-          <th>Role</th>
-          <th>Created At</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {filteredUsers.length > 0 ? (
-          filteredUsers.map((user) => (
-            <tr key={user.id}>
-              <td>{user.email}</td>
-              <td>{user.role}</td>
-              <td>{formatDateTime(user.created_at)}</td>
-              <td>
-                {user.email !== ADMIN_EMAIL && (
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => deleteUserByAdmin(user.id)}
-                  >
-                    Remove Account
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))
-        ) : (
-          <tr>
-            <td colSpan="4">No users found.</td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-</section>
-
-          <section className="card admin-card">
-            <h2>Administrator Monitoring Interface</h2>
-
-            <div className="filters">
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Filter by name (before @)"
-                value={userFilter}
-                onChange={(e) => setUserFilter(e.target.value)}
-              />
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => {
-                  setDateFilter("");
-                  setUserFilter("");
-                }}
-              >
-                Clear Filters
+        <section className="grid">
+          <div className="card panel-card user-panel-card">
+            <h2>User Panel</h2>
+            <div className="button-row">
+              <button className="primary-btn" onClick={handleTimeIn}>
+                Time In
+              </button>
+              <button className="secondary-btn" onClick={handleTimeOut}>
+                Time Out
               </button>
             </div>
+          </div>
 
+          <div className="card panel-card">
+            <h2>My Attendance History</h2>
             <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>User ID</th>
-                    <th>Email</th>
                     <th>Date</th>
                     <th>Time In</th>
                     <th>Time Out</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAdminRecords.length > 0 ? (
-                    filteredAdminRecords.map((item) => (
+                  {history.length > 0 ? (
+                    history.map((item) => (
                       <tr key={item.id}>
-                        <td>{item.user_id}</td>
-                        <td>{getEmailByUserId(item.user_id)}</td>
                         <td>{item.date}</td>
                         <td>{formatDateTime(item.time_in)}</td>
                         <td>{formatDateTime(item.time_out)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="secondary-btn"
+                            onClick={() => deleteMyAttendance(item.id)}
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="5">No matching records found.</td>
+                      <td colSpan="4">No attendance records yet.</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </section>
-        </>
-      )}
+          </div>
+        </section>
+
+        {isAdmin && (
+          <>
+            <section className="card admin-card panel-card">
+              <h2>Admin Account Panel</h2>
+
+              <div className="filters">
+                <input
+                  type="text"
+                  placeholder="Search user by email"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Created At</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.length > 0 ? (
+                      filteredUsers.map((user) => (
+                        <tr key={user.id}>
+                          <td>{user.email}</td>
+                          <td>{user.role}</td>
+                          <td>{formatDateTime(user.created_at)}</td>
+                          <td>
+                            {user.email !== ADMIN_EMAIL && (
+                              <button
+                                type="button"
+                                className="secondary-btn"
+                                onClick={() => deleteUserByAdmin(user.id)}
+                              >
+                                Remove Account
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4">No users found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="card admin-card panel-card">
+              <h2>Administrator Monitoring Interface</h2>
+
+              <div className="filters">
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                />
+                <input
+                  type="text"
+                  placeholder="Filter by name (before @)"
+                  value={userFilter}
+                  onChange={(e) => setUserFilter(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => {
+                    setDateFilter("");
+                    setUserFilter("");
+                  }}
+                >
+                  Clear Filters
+                </button>
+              </div>
+
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Email</th>
+                      <th>Date</th>
+                      <th>Time In</th>
+                      <th>Time Out</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAdminRecords.length > 0 ? (
+                      filteredAdminRecords.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.user_id}</td>
+                          <td>{getEmailByUserId(item.user_id)}</td>
+                          <td>{item.date}</td>
+                          <td>{formatDateTime(item.time_in)}</td>
+                          <td>{formatDateTime(item.time_out)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5">No matching records found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )}
+      </div>
     </div>
   );
 }
