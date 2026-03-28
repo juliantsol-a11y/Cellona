@@ -182,7 +182,8 @@ export default function App() {
         .from("attendance")
         .select("*")
         .eq("user_id", userId)
-        .order("date", { ascending: false });
+        .order("date", { ascending: false })
+        .order("time_in", { ascending: false });
 
       if (error) {
         console.error("loadMyAttendance error:", error);
@@ -235,94 +236,108 @@ export default function App() {
     }
   };
 
-  const getTodayDate = () => {
-    const now = new Date();
-    const offset = now.getTimezoneOffset();
-    const local = new Date(now.getTime() - offset * 60000);
-    return local.toISOString().split("T")[0];
+  const handleTimeIn = async () => {
+    setMessage("");
+
+    const { data: openRecord, error: openError } = await supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .is("time_out", null)
+      .order("time_in", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (openError) {
+      setMessage(openError.message);
+      return;
+    }
+
+    if (openRecord) {
+      setMessage("You already have an open time-in record. Please time out first.");
+      return;
+    }
+
+    const { error } = await supabase.from("attendance").insert([
+      {
+        user_id: session.user.id,
+        date: new Date().toISOString().split("T")[0],
+        time_in: new Date().toISOString(),
+        time_out: null,
+        status: "open",
+      },
+    ]);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("Time-in recorded successfully.");
+    loadMyAttendance(session.user.id);
+    if (isAdmin) loadAllAttendance();
   };
 
-  const handleTimeIn = async () => {
-  setMessage("");
-
-  const { data: openRecord, error: openError } = await supabase
-    .from("attendance")
-    .select("*")
-    .eq("user_id", session.user.id)
-    .is("time_out", null)
-    .order("time_in", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (openError) {
-    setMessage(openError.message);
-    return;
-  }
-
-  if (openRecord) {
-    setMessage("You already have an open time-in record. Please time out first.");
-    return;
-  }
-
-  const { error } = await supabase.from("attendance").insert([
-    {
-      user_id: session.user.id,
-      date: new Date().toISOString().split("T")[0],
-      time_in: new Date().toISOString(),
-      time_out: null,
-      status: "open",
-    },
-  ]);
-
-  if (error) {
-    setMessage(error.message);
-    return;
-  }
-
-  setMessage("Time-in recorded successfully.");
-  loadMyAttendance(session.user.id);
-  if (isAdmin) loadAllAttendance();
-};
-
   const handleTimeOut = async () => {
-  setMessage("");
+    setMessage("");
 
-  const { data: existing, error: checkError } = await supabase
-    .from("attendance")
-    .select("*")
-    .eq("user_id", session.user.id)
-    .is("time_out", null)
-    .order("time_in", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const { data: existing, error: checkError } = await supabase
+      .from("attendance")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .is("time_out", null)
+      .order("time_in", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (checkError) {
-    setMessage(checkError.message);
-    return;
-  }
+    if (checkError) {
+      setMessage(checkError.message);
+      return;
+    }
 
-  if (!existing) {
-    setMessage("No open time-in record found.");
-    return;
-  }
+    if (!existing) {
+      setMessage("No open time-in record found.");
+      return;
+    }
 
-  const { error } = await supabase
-    .from("attendance")
-    .update({
-      time_out: new Date().toISOString(),
-      status: "completed",
-    })
-    .eq("id", existing.id);
+    const { error } = await supabase
+      .from("attendance")
+      .update({
+        time_out: new Date().toISOString(),
+        status: "completed",
+      })
+      .eq("id", existing.id);
 
-  if (error) {
-    setMessage(error.message);
-    return;
-  }
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
 
-  setMessage("Time-out recorded successfully.");
-  loadMyAttendance(session.user.id);
-  if (isAdmin) loadAllAttendance();
-};
+    setMessage("Time-out recorded successfully.");
+    loadMyAttendance(session.user.id);
+    if (isAdmin) loadAllAttendance();
+  };
+
+  const deleteMyAttendance = async (attendanceId) => {
+    const confirmed = window.confirm("Delete this attendance record?");
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("attendance")
+      .delete()
+      .eq("id", attendanceId)
+      .eq("user_id", session.user.id);
+
+    if (error) {
+      console.error("Delete error:", error);
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("Attendance record deleted successfully.");
+    loadMyAttendance(session.user.id);
+    if (isAdmin) loadAllAttendance();
+  };
 
   const formatDateTime = (value) => {
     if (!value) return "-";
