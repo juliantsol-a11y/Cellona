@@ -58,8 +58,12 @@ p {
 }
 
 .page {
-  width: 100%;
-  max-width: 1220px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;   /* CENTER HORIZONTALLY */
+  justify-content: flex-start;
+  padding: 30px 16px;
 }
 
 /* Login */
